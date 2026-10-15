@@ -1,0 +1,198 @@
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3WindowSizeClassApi::class)
+
+package com.example.modoguardian.ui.screens
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.modoguardian.model.Rol
+import com.example.modoguardian.model.SecurityEvent
+import com.example.modoguardian.navigation.Screen
+import com.example.modoguardian.ui.components.TarjetaEventos
+import com.example.modoguardian.ui.components.TarjetaModoGuardian
+import com.example.modoguardian.ui.components.TarjetaRol
+import com.example.modoguardian.ui.theme.ModoGuardianTheme
+import com.example.modoguardian.ui.utils.obtenerWindowSizeClass
+import com.example.modoguardian.viewmodel.EstadoViewModel
+import com.example.modoguardian.viewmodel.LoginViewModel
+import com.example.modoguardian.viewmodel.MainViewModel
+
+// ---------------------------------------------------------------------------
+// Home conectado a los ViewModels. Observa el MISMO LoginViewModel del login
+// con collectAsState() para saber el rol, sin pasar argumentos por la navegación.
+// ---------------------------------------------------------------------------
+@Composable
+fun HomeScreen(
+    loginViewModel: LoginViewModel,
+    mainViewModel: MainViewModel,
+    estadoViewModel: EstadoViewModel = viewModel()
+) {
+    val estadoLogin by loginViewModel.estado.collectAsState()
+    val estadoActivo by estadoViewModel.activo.collectAsState()
+    val mostrarMensaje by estadoViewModel.mostrarMensaje.collectAsState()
+    val windowSizeClass = obtenerWindowSizeClass()
+
+    val rol = estadoLogin.rol
+
+    if (rol == null) {
+        // Sin sesión (cierre de sesión o proceso recreado por el sistema): se vuelve al Login
+        LaunchedEffect(Unit) {
+            mainViewModel.navigateTo(Screen.Login, limpiarPila = true)
+        }
+    } else {
+        HomeContenido(
+            rol = rol,
+            email = estadoLogin.email,
+            eventos = mainViewModel.events,
+            estadoActivo = estadoActivo,
+            mostrarMensaje = mostrarMensaje,
+            widthSizeClass = windowSizeClass.widthSizeClass,
+            onAlternarEstado = estadoViewModel::alternarEstado,
+            onCerrarSesion = loginViewModel::cerrarSesion
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Contenido sin ViewModel (reutilizable en previews).
+// Compact = Column de tarjetas; Medium/Expanded = Row de dos columnas.
+// ---------------------------------------------------------------------------
+@Composable
+fun HomeContenido(
+    rol: Rol,
+    email: String,
+    eventos: List<SecurityEvent>,
+    estadoActivo: Boolean?,
+    mostrarMensaje: Boolean,
+    widthSizeClass: WindowWidthSizeClass,
+    onAlternarEstado: () -> Unit,
+    onCerrarSesion: () -> Unit
+) {
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text(text = "Modo Guardián") },
+                actions = {
+                    TextButton(onClick = onCerrarSesion) {
+                        Text(text = "Cerrar sesión")
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        val modifierBase = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+            .padding(16.dp)
+
+        if (widthSizeClass == WindowWidthSizeClass.Compact) {
+            // COMPACT: todo apilado en una columna con scroll
+            Column(
+                modifier = modifierBase.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                TarjetaRol(rol = rol, email = email)
+                // Solo Admin y Supervisor pueden cambiar el Modo Guardián
+                if (rol.puedeCambiarModo) {
+                    TarjetaModoGuardian(
+                        estadoActivo = estadoActivo,
+                        mostrarMensaje = mostrarMensaje,
+                        onAlternarEstado = onAlternarEstado
+                    )
+                }
+                TarjetaEventos(eventos = eventos)
+            }
+        } else {
+            // MEDIUM / EXPANDED: rol y control a la izquierda, eventos a la derecha
+            Row(
+                modifier = modifierBase,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    TarjetaRol(rol = rol, email = email)
+                    if (rol.puedeCambiarModo) {
+                        TarjetaModoGuardian(
+                            estadoActivo = estadoActivo,
+                            mostrarMensaje = mostrarMensaje,
+                            onAlternarEstado = onAlternarEstado
+                        )
+                    }
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    TarjetaEventos(eventos = eventos)
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Previews
+// ---------------------------------------------------------------------------
+private val eventosPreview = listOf(
+    SecurityEvent(id = "1", title = "Movimiento detectado", description = "Actividad en el perímetro."),
+    SecurityEvent(id = "2", title = "Estado del sistema", description = "Todos los módulos operando.")
+)
+
+@Preview(name = "Home Compact - Supervisor", widthDp = 360, heightDp = 800, showBackground = true)
+@Composable
+private fun HomeCompactPreview() {
+    ModoGuardianTheme {
+        HomeContenido(
+            rol = Rol.SUPERVISOR,
+            email = "supervisor@guardian.test",
+            eventos = eventosPreview,
+            estadoActivo = true,
+            mostrarMensaje = false,
+            widthSizeClass = WindowWidthSizeClass.Compact,
+            onAlternarEstado = {},
+            onCerrarSesion = {}
+        )
+    }
+}
+
+@Preview(name = "Home Expanded - Admin", widthDp = 1100, heightDp = 800, showBackground = true)
+@Composable
+private fun HomeExpandedPreview() {
+    ModoGuardianTheme {
+        HomeContenido(
+            rol = Rol.ADMIN,
+            email = "admin@guardian.test",
+            eventos = eventosPreview,
+            estadoActivo = false,
+            mostrarMensaje = false,
+            widthSizeClass = WindowWidthSizeClass.Expanded,
+            onAlternarEstado = {},
+            onCerrarSesion = {}
+        )
+    }
+}
