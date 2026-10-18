@@ -16,10 +16,13 @@ import com.example.modoguardian.navigation.NavigationEvent
 import com.example.modoguardian.navigation.Screen
 import com.example.modoguardian.ui.screens.HomeScreen
 import com.example.modoguardian.ui.screens.LoginScreen
+import com.example.modoguardian.ui.screens.ProfileScreen
 import com.example.modoguardian.ui.theme.ModoGuardianTheme
 import com.example.modoguardian.viewmodel.LoginViewModel
 import com.example.modoguardian.viewmodel.MainViewModel
+import com.example.modoguardian.viewmodel.PerfilViewModel
 
+// Actividad principal: navegación entre Login, Home y Perfil con ViewModels compartidos
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,10 +32,9 @@ class MainActivity : ComponentActivity() {
             ModoGuardianTheme {
                 val navController = rememberNavController()
 
-
                 val mainViewModel: MainViewModel = viewModel()
                 val loginViewModel: LoginViewModel = viewModel()
-
+                val perfilViewModel: PerfilViewModel = viewModel()
 
                 LaunchedEffect(Unit) {
                     mainViewModel.navigationEvent.collect { evento ->
@@ -70,6 +72,13 @@ class MainActivity : ComponentActivity() {
                         HomeScreen(
                             loginViewModel = loginViewModel,
                             mainViewModel = mainViewModel
+                        )
+                    }
+                    composable(Screen.Profile.route) {
+                        ProfileScreen(
+                            navController = navController,
+                            viewModel = mainViewModel,
+                            perfilViewModel = perfilViewModel
                         )
                     }
                 }

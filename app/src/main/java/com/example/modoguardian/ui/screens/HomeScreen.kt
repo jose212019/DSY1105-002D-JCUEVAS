@@ -36,10 +36,7 @@ import com.example.modoguardian.viewmodel.EstadoViewModel
 import com.example.modoguardian.viewmodel.LoginViewModel
 import com.example.modoguardian.viewmodel.MainViewModel
 
-// ---------------------------------------------------------------------------
-// Home conectado a los ViewModels. Observa el MISMO LoginViewModel del login
-// con collectAsState() para saber el rol, sin pasar argumentos por la navegación.
-// ---------------------------------------------------------------------------
+// Home conectado a los ViewModels: observa el rol del login y permite ir a Perfil
 @Composable
 fun HomeScreen(
     loginViewModel: LoginViewModel,
@@ -54,7 +51,6 @@ fun HomeScreen(
     val rol = estadoLogin.rol
 
     if (rol == null) {
-        // Sin sesión (cierre de sesión o proceso recreado por el sistema): se vuelve al Login
         LaunchedEffect(Unit) {
             mainViewModel.navigateTo(Screen.Login, limpiarPila = true)
         }
@@ -67,15 +63,13 @@ fun HomeScreen(
             mostrarMensaje = mostrarMensaje,
             widthSizeClass = windowSizeClass.widthSizeClass,
             onAlternarEstado = estadoViewModel::alternarEstado,
-            onCerrarSesion = loginViewModel::cerrarSesion
+            onCerrarSesion = loginViewModel::cerrarSesion,
+            onIrAPerfil = { mainViewModel.navigateTo(Screen.Profile) }
         )
     }
 }
 
-// ---------------------------------------------------------------------------
-// Contenido sin ViewModel (reutilizable en previews).
-// Compact = Column de tarjetas; Medium/Expanded = Row de dos columnas.
-// ---------------------------------------------------------------------------
+// Contenido sin ViewModel: Compact usa Column, Medium/Expanded usa Row de dos columnas
 @Composable
 fun HomeContenido(
     rol: Rol,
@@ -85,7 +79,8 @@ fun HomeContenido(
     mostrarMensaje: Boolean,
     widthSizeClass: WindowWidthSizeClass,
     onAlternarEstado: () -> Unit,
-    onCerrarSesion: () -> Unit
+    onCerrarSesion: () -> Unit,
+    onIrAPerfil: () -> Unit
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -93,6 +88,9 @@ fun HomeContenido(
             TopAppBar(
                 title = { Text(text = "Modo Guardián") },
                 actions = {
+                    TextButton(onClick = onIrAPerfil) {
+                        Text(text = "Perfil")
+                    }
                     TextButton(onClick = onCerrarSesion) {
                         Text(text = "Cerrar sesión")
                     }
@@ -106,13 +104,11 @@ fun HomeContenido(
             .padding(16.dp)
 
         if (widthSizeClass == WindowWidthSizeClass.Compact) {
-            // COMPACT: todo apilado en una columna con scroll
             Column(
                 modifier = modifierBase.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 TarjetaRol(rol = rol, email = email)
-                // Solo Admin y Supervisor pueden cambiar el Modo Guardián
                 if (rol.puedeCambiarModo) {
                     TarjetaModoGuardian(
                         estadoActivo = estadoActivo,
@@ -123,7 +119,6 @@ fun HomeContenido(
                 TarjetaEventos(eventos = eventos)
             }
         } else {
-            // MEDIUM / EXPANDED: rol y control a la izquierda, eventos a la derecha
             Row(
                 modifier = modifierBase,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -155,9 +150,6 @@ fun HomeContenido(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Previews
-// ---------------------------------------------------------------------------
 private val eventosPreview = listOf(
     SecurityEvent(id = "1", title = "Movimiento detectado", description = "Actividad en el perímetro."),
     SecurityEvent(id = "2", title = "Estado del sistema", description = "Todos los módulos operando.")
@@ -175,7 +167,8 @@ private fun HomeCompactPreview() {
             mostrarMensaje = false,
             widthSizeClass = WindowWidthSizeClass.Compact,
             onAlternarEstado = {},
-            onCerrarSesion = {}
+            onCerrarSesion = {},
+            onIrAPerfil = {}
         )
     }
 }
@@ -192,7 +185,8 @@ private fun HomeExpandedPreview() {
             mostrarMensaje = false,
             widthSizeClass = WindowWidthSizeClass.Expanded,
             onAlternarEstado = {},
-            onCerrarSesion = {}
+            onCerrarSesion = {},
+            onIrAPerfil = {}
         )
     }
 }

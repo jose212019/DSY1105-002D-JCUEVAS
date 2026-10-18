@@ -1,6 +1,9 @@
 package com.example.modoguardian.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -13,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -22,6 +26,7 @@ import com.example.modoguardian.viewmodel.MainViewModel
 import com.example.modoguardian.viewmodel.PerfilViewModel
 import java.io.File
 
+// Pantalla de perfil: elige foto de la galería o toma una con la cámara (pide permiso antes)
 @Composable
 fun ProfileScreen(
     navController: NavController,
@@ -31,24 +36,42 @@ fun ProfileScreen(
     val items = listOf(Screen.Home, Screen.Profile)
     var selectedItem by remember { mutableStateOf(1) }
 
-
     val context = LocalContext.current
     val imagenUri by perfilViewModel.imagenUri.collectAsState()
     var uriCamaraTemporal by remember { mutableStateOf<Uri?>(null) }
 
-    // Lanzador para abrir la Galeria
     val launcherGaleria = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) perfilViewModel.actualizarImagen(uri)
     }
 
-    // Lanzador para abrir la Cámara
     val launcherCamara = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { exito ->
         if (exito && uriCamaraTemporal != null) {
             perfilViewModel.actualizarImagen(uriCamaraTemporal)
+        }
+    }
+
+    val abrirCamara = {
+        val archivoTemporal = File.createTempFile("foto_", ".jpg", context.cacheDir)
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            archivoTemporal
+        )
+        uriCamaraTemporal = uri
+        launcherCamara.launch(uri)
+    }
+
+    val launcherPermisoCamara = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { concedido ->
+        if (concedido) {
+            abrirCamara()
+        } else {
+            Toast.makeText(context, "Se necesita permiso de cámara", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -87,7 +110,6 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            // Botón para seleccionar de la Galeria
             Button(
                 onClick = { launcherGaleria.launch("image/*") },
                 modifier = Modifier.fillMaxWidth().height(55.dp)
@@ -97,17 +119,18 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Botón para tomar foto con la Cámara
             Button(
                 onClick = {
-                    // Crea un archivo temporal usando el FileProvider de la Parte 1
-                    val archivoTemporal = File.createTempFile("foto_", ".jpg", context.cacheDir)
-                    uriCamaraTemporal = FileProvider.getUriForFile(
+                    val tienePermiso = ContextCompat.checkSelfPermission(
                         context,
-                        "${context.packageName}.provider",
-                        archivoTemporal
-                    )
-                    launcherCamara.launch(uriCamaraTemporal!!)
+                        Manifest.permission.CAMERA
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                    if (tienePermiso) {
+                        abrirCamara()
+                    } else {
+                        launcherPermisoCamara.launch(Manifest.permission.CAMERA)
+                    }
                 },
                 modifier = Modifier.fillMaxWidth().height(55.dp)
             ) {
